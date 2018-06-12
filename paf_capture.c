@@ -114,14 +114,6 @@ int main(int argc, char **argv)
 	}
     }
 
-  fprintf(stdout, "%s\t%d\n", conf.ip[2], conf.port[3]);
-  exit(1);
-  
-  // Hostname, ip etc
-  hostname[HN_LEN] = '0';
-  gethostname(hostname, HN_LEN + 1);
-  node_id = hostname[HN_LEN - 1] - '0';
-  sprintf(ip, "10.17.%d.%d", node_id, nic_id);
 
 #ifdef DEBUG
   fprintf(stdout, "*********************************************\n");
@@ -148,10 +140,7 @@ int main(int argc, char **argv)
   multilog(runtime_log, LOG_INFO, "START PAF_CAPTURE\n");
 
   /* Capture part*/
-  int ports[MPORT_NIC];
-  for (i = 0; i < NPORT_NIC; i++)
-    ports[i] = PORT_BASE + i;
-  if(init_capture(&conf, ip, ports) == EXIT_FAILURE)
+  if(init_capture(&conf) == EXIT_FAILURE)
     {
       multilog(runtime_log, LOG_ERR, "Can not initialise the capture, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       //fprintf (stderr, "Can not initialise the capture, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

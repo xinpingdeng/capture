@@ -143,13 +143,13 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
   return EXIT_SUCCESS;
 }
 
-int init_sockets(sock_t *sock, char *ip, int *ports)
+int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int nport)
 {  
   int i;
   struct timeval time_out={PRD_SEC, 0}; 
   // Force to timeout if we could not receive data frames for one period.
   
-  for (i = 0; i < NPORT_NIC; i++)
+  for (i = 0; i < nport; i++)
     {
       sock[i].active = 1;
       sock[i].ndf    = 0;
@@ -159,8 +159,8 @@ int init_sockets(sock_t *sock, char *ip, int *ports)
             
       memset(&sock[i].sa, 0x00, sizeof(sock[i].sa));
       sock[i].sa.sin_family      = AF_INET;
-      sock[i].sa.sin_port        = htons(ports[i]);
-      sock[i].sa.sin_addr.s_addr = inet_addr(ip);
+      sock[i].sa.sin_port        = htons(port[i]);
+      sock[i].sa.sin_addr.s_addr = inet_addr(ip[i]);
       
       if (-1 == bind(sock[i].sock, (struct sockaddr *)&sock[i].sa, sizeof(sock[i].sa)))
 	{
@@ -201,7 +201,7 @@ int sock_sort(sock_t *sock)
   return EXIT_SUCCESS;
 }
 
-int init_capture(conf_t *conf, char *ip, int *ports)
+int init_capture(conf_t *conf)
 {  
   int i;
   uint64_t tbufsz;
@@ -244,7 +244,7 @@ int init_capture(conf_t *conf, char *ip, int *ports)
 #endif
     
   /* Initialise sockets */
-  if(init_sockets(conf->sock, ip, ports) == EXIT_FAILURE)
+  if(init_sockets(conf->sock, conf->ip, conf->port, conf->nport) == EXIT_FAILURE)
     {
       multilog(runtime_log, LOG_ERR, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

@@ -42,21 +42,18 @@ print "The centre frequency is {:.1f}MHz".format(freq)
 parser = argparse.ArgumentParser(description='Fold data from BMF stream')
 parser.add_argument('-a', '--cfname', type=str, nargs='+',
                     help='The name of configuration file')
-parser.add_argument('-b', '--ip', type=str, nargs='+',
-                    help='On which ip we receive data')
-parser.add_argument('-c', '--port', type=int, nargs='+',
-                    help='On which port we receive data')
-parser.add_argument('-d', '--length', type=float, nargs='+',
+parser.add_argument('-b', '--address', type=str, nargs='+',
+                    help='On which ip and port we receive data')
+parser.add_argument('-c', '--length', type=float, nargs='+',
                 help='Length of data receiving')
-parser.add_argument('-e', '--directory', type=str, nargs='+',
+parser.add_argument('-d', '--directory', type=str, nargs='+',
                     help='In which directory we record the data and read configuration files and parameter files')
 
 args         = parser.parse_args()
 cfname       = args.cfname[0]
-ip           = args.ip[0]
 length       = args.length[0]
 directory    = args.directory[0]
-port         = args.port
+address      = args.address
 
 # Play with configuration file
 Config = ConfigParser.ConfigParser()
@@ -84,8 +81,8 @@ capture_sod     = ConfigSectionMap("CaptureConf")['sod']
 capture_rbufsz  = capture_ndf *  nchk_nic * 7168
 
 def capture():
-    print ("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, ip, port[0], ip, port[1], ip, port[2], ip, port[3], ip, port[4], ip, port[5], capture_hfname, capture_efname, freq, length, directory))
-    os.system("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -e {:s}:{:d} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, ip, port[0], ip, port[1], ip, port[2], ip, port[3], ip, port[4], ip, port[5], capture_hfname, capture_efname, freq, length, directory))
+    print ("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, address[0], address[1], address[2], address[3], address[4], address[5],  capture_hfname, capture_efname, freq, length, directory))
+    os.system("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, address[0], address[1], address[2], address[3], address[4], address[5],  capture_hfname, capture_efname, freq, length, directory))
     
 def main():
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:s} -r {:s}".format(capture_key, capture_rbufsz, capture_nbuf, capture_nreader))
