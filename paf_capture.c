@@ -113,6 +113,7 @@ int main(int argc, char **argv)
 	  break;
 	}
     }
+
   fprintf(stdout, "%s\t%d\n", conf.ip[2], conf.port[3]);
   exit(1);
   
