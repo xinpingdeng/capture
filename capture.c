@@ -98,7 +98,7 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	  else               // If the port is active, we check the available frequency chunks
 	    {
 	      freq = hdr_freq(df);
-	      
+	      fprintf(stdout, "%f\n", freq);
 	      if(freq==0)    // Frequency can not be zero
 		{
 		  multilog(runtime_log, LOG_ERR, "The data received on %s:%d is not right, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
@@ -109,6 +109,7 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	      if(j == 0) // The frequency in the first data frame must to be recorded 
 		{
 		  sock[i].freq[chunk_index] = freq;
+		  //fprintf(stdout, "%f\n", freq);
 		  chunk_index ++ ;
 		}
 	      else      // Record the frequency in later data frames if it is not a duplicate of any previous frequencies 

@@ -138,7 +138,7 @@ int main(int argc, char **argv)
   runtime_log = multilog_open("paf_capture", 1);
   multilog_add(runtime_log, fp_log);
   multilog(runtime_log, LOG_INFO, "START PAF_CAPTURE\n");
-
+    
   /* Capture part*/
   if(init_capture(&conf) == EXIT_FAILURE)
     {
