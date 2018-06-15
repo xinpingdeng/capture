@@ -54,7 +54,7 @@ pthread_mutexattr_t force_switch_mutex_attr;
 pthread_mutex_t hdr_ref_mutex[MPORT_NIC] = {PTHREAD_MUTEX_INITIALIZER};
 pthread_mutexattr_t hdr_ref_mutex_attr[MPORT_NIC];
 
-int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
+int check_connection(sock_t *sock, int nport, int *active_nport, int *nchunk)
 {
   int i, j, k, duplicate, chunk_index;
   double freq;
@@ -66,17 +66,17 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
   fprintf(stdout, "*********************************************\n");
 #endif
   
-  (*active_ports) = 0;
-  (*active_chunks) = 0;
+  (*active_nport) = 0;
+  (*nchunk) = 0;
 
-  for(i = 0; i < NPORT_NIC; i++)   // Create threads
+  for(i = 0; i < nport; i++)   // Create threads
     {
       /* Default have zero chunks per port */
       chunk_index = 0;
       
       /* The port is default to be active */
       sock[i].active = 1;
-      (*active_ports) ++;
+      (*active_nport) ++;
       
       /* Set default frequency value to zero */
       for (j = 0; j < MCHK_PORT; j++)
@@ -91,7 +91,7 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	      multilog(runtime_log, LOG_ERR, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	      fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	      sock[i].active = 0;
-	      (*active_ports)--;
+	      (*active_nport)--;
 	      close(sock[i].sock);
 	      return EXIT_FAILURE;
 	    }
@@ -127,10 +127,10 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	    }
 	}
 
-      sock[i].chunks = chunk_index; // Update the number of available chunks to its real value
-      (*active_chunks) += chunk_index;
+      sock[i].nchunk_port = chunk_index; // Update the number of available chunks to its real value
+      (*nchunk) += chunk_index;
 #ifdef DEBUG
-      fprintf(stdout, "%d chunks available on %s:%d\n", sock[i].chunks, inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port));
+      fprintf(stdout, "%d chunks available on %s:%d\n", sock[i].nchunk_port, inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port));
 #endif
     }
 
@@ -139,23 +139,27 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 #endif
 
   /* Sort sockets to make sure that active sockets are at the beginning of array */
-  sock_sort(sock);
+  sock_sort(sock, nport);
   
   return EXIT_SUCCESS;
 }
 
-int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int nport)
+int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int *nchunk_port, int nport, int *active_nport, int *nchunk)
 {  
-  int i;
-  struct timeval time_out={PRD_SEC, 0}; 
-  // Force to timeout if we could not receive data frames for one period.
+  int i, start;
+  struct timeval time_out={PRD_SEC, 0};  // Force to timeout if we could not receive data frames for one period.
+  hdr_t hdr_start;
+  char df[DF_SIZE];
   
+  start = 0;
+  *active_nport  = 0;
+  *nchunk = 0;
   for (i = 0; i < nport; i++)
     {
-      sock[i].active = 1;
-      sock[i].ndf    = 0;
-      sock[i].chunks = 0;
-      sock[i].sock   = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+      sock[i].active      = 1;
+      sock[i].ndf         = 0;
+      sock[i].nchunk_port = nchunk_port[i];
+      sock[i].sock        = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
       setsockopt(sock[i].sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&time_out, sizeof(time_out));
             
       memset(&sock[i].sa, 0x00, sizeof(sock[i].sa));
@@ -167,28 +171,46 @@ int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int npor
 	{
 	  multilog(runtime_log, LOG_ERR, "Bind to %s:%d failed, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	  fprintf (stderr, "Bind to %s:%d failed, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
-	  close(sock[i].sock);
 	  sock[i].active = 0;
-	  return EXIT_FAILURE;
+	  close(sock[i].sock);
+	}
+      else
+	{
+	  (*active_nport)  ++;
+	  (*nchunk) += nchunk_port[i];
+	  
+	  if(start == 0)
+	    {
+	      recv(sock[i].sock, (void *)df, DF_SIZE, 0); // We just init the socket, therefore do not check the return value here
+	      hdr_keys(df, &hdr_start);	      
+	      start = 1;	    
+	    }
 	}
     }
-    
+
+  if(*active_nport == 0) // If there is no active port, abort
+    return EXIT_FAILURE;
+
+  sock_sort(sock, nport);
+  for(i = 0; i < (*active_nport); i++)
+    sock[i].hdr_start = hdr_start;
+  
   return EXIT_SUCCESS;
 }
 
 /* 
    Sort socket array to get active sockets at the beginning of socket array 
 */
-int sock_sort(sock_t *sock)
+int sock_sort(sock_t *sock, int nport)
 {
   int i, j;
   sock_t sock_temp;
 
-  for(i = 0; i < NPORT_NIC; i++)  
+  for(i = 0; i < nport; i++)  
     {
       if(sock[i].active == 0)
 	{
-	  for(j = NPORT_NIC - 1; j > i; j--)
+	  for(j = nport - 1; j > i; j--)
 	    {
 	      if(sock[j].active == 1)
 		{
@@ -209,7 +231,7 @@ int init_capture(conf_t *conf)
   int pkt_size;
   double elapsed_time;
   uint64_t rbufsz;
-  int active_ports, active_chunks;
+  int active_nport, nchunk;
   struct timespec start, stop;
   FILE *conf_fp=NULL;
   char line[MSTR_LEN];
@@ -245,33 +267,33 @@ int init_capture(conf_t *conf)
 #endif
     
   /* Initialise sockets */
-  if(init_sockets(conf->sock, conf->ip, conf->port, conf->nport) == EXIT_FAILURE)
+  if(init_sockets(conf->sock, conf->ip, conf->port, conf->nchunk_port, conf->nport, &(conf->active_nport), &(conf->nchunk)) == EXIT_FAILURE)
     {
       multilog(runtime_log, LOG_ERR, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
-  
-  /* Check the available ports and frequency chunks */
-  if(check_connection(conf->sock, &active_ports, &active_chunks) == EXIT_FAILURE)
-    {
-      multilog(runtime_log, LOG_ERR, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE;
-    }  
-  conf->active_ports  = active_ports;
-  conf->active_chunks = active_chunks;
-    
-  /* Align data frames from different sockets, which will make futhre work easier */
-  if(align_df(conf->sock, active_ports) == EXIT_FAILURE)
-    {
-      multilog(runtime_log, LOG_ERR, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      fprintf (stderr, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-      return EXIT_FAILURE; 
-    }
+
+  ///* Check the available ports and frequency chunks */
+  //if(check_connection(conf->sock, conf->nport, &active_nport, &nchunk) == EXIT_FAILURE)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf (stderr, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE;
+  //  }
+  //conf->active_nport  = active_nport;
+  //conf->nchunk = nchunk;
+  //  
+  ///* Align data frames from different sockets, which will make futhre work easier */
+  //if(align_df(conf->sock, active_nport) == EXIT_FAILURE)
+  //  {
+  //    multilog(runtime_log, LOG_ERR, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    fprintf (stderr, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  //    return EXIT_FAILURE; 
+  //  }
 
   /* Get the end condition of capture */
-  acquire_hdr_end(conf->sock, conf->length, active_ports);
+  acquire_hdr_end(conf->sock, conf->length, conf->active_nport);
   
   /* Initialise the catpure status */
   for(i = 0; i < MPORT_NIC; i++)
@@ -293,7 +315,7 @@ int init_capture(conf_t *conf)
   pthread_mutex_init(&ithread_mutex, &ithread_mutex_attr);
   pthread_mutexattr_init(&force_switch_mutex_attr);
   pthread_mutexattr_settype(&force_switch_mutex_attr, PTHREAD_PROCESS_SHARED);
-  for(i = 0; i < active_ports; i++)
+  for(i = 0; i < conf->active_nport; i++)
     {      
       pthread_mutexattr_init(&hdr_ref_mutex_attr[i]);
       pthread_mutexattr_settype(&hdr_ref_mutex_attr[i], PTHREAD_PROCESS_SHARED);
@@ -301,10 +323,7 @@ int init_capture(conf_t *conf)
     }
 
   /* Register header, get available data block and get start time */
-  for(i = 0; i < NPORT_NIC; i++)  // Get the active sock
-    if(conf->sock[i].active)
-      break;
-  acquire_start_time(conf->sock[i].hdr_start, conf->efname, conf->utc_start, &(conf->picoseconds));
+  acquire_start_time(conf->sock[0].hdr_start, conf->efname, conf->utc_start, &(conf->picoseconds));
   if(register_header(conf))
     {
       multilog(runtime_log, LOG_ERR, "Header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -324,14 +343,14 @@ int init_capture(conf_t *conf)
    1. Find out the current data frame with each socket;
    2. Find out most recent data frame among different sockets;
    3. Push the socket forward until all sockets drops the most recent data frame;
-   4. The most recent data frame will be the reference one for data capture;
+     4. The most recent data frame will be the reference one for data capture;
    5. Record the information about the most recent data frame for later use;
    We do not need to start at the reference data frame for real data capture as we use header to locate all captured data frames;
 
    The above is for original design, now we do not need to force all threads start at the same data frame;
    So the mean of this function is that we can get a reference hdr for later use;
 */
-int align_df(sock_t *sock, int active_ports)
+int align_df(sock_t *sock, int active_nport)
 {
   int i;
   hdr_t hdr, hdr_current;
@@ -348,7 +367,7 @@ int align_df(sock_t *sock, int active_ports)
   hdr_current = hdr;
 
   /* Get the most recent data frame among different sockets; */
-  for(i = 0; i < active_ports; i++)
+  for(i = 0; i < active_nport; i++)
     {
       if (recv(sock[i].sock, (void *)df, DF_SIZE, 0) < 0)
 	// If the size is -1, means we get time out and the port is not active
@@ -372,7 +391,7 @@ int align_df(sock_t *sock, int active_ports)
 #endif
   
   /* Drop data frame cross the most recent one */
-  for (i = 0; i < active_ports; i++)
+  for (i = 0; i < active_nport; i++)
     {
       while(true)
 	{
@@ -652,14 +671,14 @@ int init_rbuf(conf_t *conf)
 int destroy_capture(conf_t conf)
 {  
   free(tbuf);
-  destroy_sockets(conf.sock);
+  destroy_sockets(conf.sock, conf.active_nport);
   
   /* Destroy mutex */
   int i;
   pthread_mutex_destroy(&ithread_mutex);
   pthread_mutex_destroy(&quit_mutex);
   pthread_mutex_destroy(&force_switch_mutex);
-  for(i = 0; i < conf.active_ports; i++)
+  for(i = 0; i < conf.active_nport; i++)
     pthread_mutex_destroy(&hdr_ref_mutex[i]);
 
   dada_hdu_unlock_write(conf.hdu);
@@ -669,10 +688,10 @@ int destroy_capture(conf_t conf)
   return EXIT_SUCCESS;
 }
 
-int destroy_sockets(sock_t *sock)
+int destroy_sockets(sock_t *sock, int active_nport)
 {
   int i;
-  for(i = 0; i < NPORT_NIC; i++)  // Clean up sockets and ip
+  for(i = 0; i < active_nport; i++)  // Clean up sockets and ip
     {
       if(sock[i].active)
   	close(sock[i].sock);
@@ -680,11 +699,11 @@ int destroy_sockets(sock_t *sock)
   return EXIT_SUCCESS;
 }
 
-int acquire_hdr_end(sock_t *sock, double length, int active_ports)
+int acquire_hdr_end(sock_t *sock, double length, int active_nport)
 {
   int i;
 
-  for(i = 0; i < active_ports; i++)
+  for(i = 0; i < active_nport; i++)
     {
       /* We stop at the first data frame, does not matter from which chunks */
       //sock[i].hdr_end.sec = (uint64_t)((int)(length/PRD_SEC) * PRD_SEC + sock[i].hdr_start.sec);
@@ -714,19 +733,20 @@ int statistics(conf_t conf)
 
   multilog(runtime_log, LOG_INFO, "Address\t\tPort\tChunks\tElapsed\tExpected\tReal\tLoss\n");
   fprintf(stdout, "\nAddress\t\tPort\tChunks\tElapsed\tExpected\tReal\tLoss\n");
-  for(i = 0; i < conf.active_ports; i++)
+  //for(i = 0; i < conf.active_nport; i++)
+  for(i = 0; i < conf.nport; i++)
     {
       sock = conf.sock[i];
       
       ndf_real = sock.ndf;
-      //ndf_expected = (uint64_t)(sock.chunks * (sock.hdr_end.idf - sock.hdr_start.idf + NDF_PRD * (sock.hdr_end.sec - sock.hdr_start.sec)/PRD_SEC));
-      //ndf_expected = (uint64_t)(sock.chunks * (sock.hdr_end.idf - sock.hdr_start.idf + (sock.hdr_end.sec - sock.hdr_start.sec)/TDF_SEC));
-      //ndf_expected = (uint64_t)(sock.chunks * (sock.hdr_end.idf - sock.hdr_start.idf + (sock.hdr_end.sec - sock.hdr_start.sec)/TDF_SEC));
-      ndf_expected = (uint64_t)(sock.chunks * conf.length/TDF_SEC);
+      //ndf_expected = (uint64_t)(sock.nchunk_port * (sock.hdr_end.idf - sock.hdr_start.idf + NDF_PRD * (sock.hdr_end.sec - sock.hdr_start.sec)/PRD_SEC));
+      //ndf_expected = (uint64_t)(sock.nchunk_port * (sock.hdr_end.idf - sock.hdr_start.idf + (sock.hdr_end.sec - sock.hdr_start.sec)/TDF_SEC));
+      //ndf_expected = (uint64_t)(sock.nchunk_port * (sock.hdr_end.idf - sock.hdr_start.idf + (sock.hdr_end.sec - sock.hdr_start.sec)/TDF_SEC));
+      ndf_expected = (uint64_t)(sock.nchunk_port * conf.length/TDF_SEC);
       
       //fprintf(stdout, "%f\n", (sock.hdr_end.sec - sock.hdr_start.sec)/TDF_SEC);
-      multilog(runtime_log, LOG_INFO, "%s\t\t%d\t%d\t%.3f\t%"PRIu64"\t\t%"PRIu64"\t%.1E\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), sock.chunks, sock.elapsed_time, ndf_expected, ndf_real, (double)((int64_t)(ndf_expected - ndf_real))/ndf_expected);
-      fprintf(stdout, "%s\t%d\t%d\t%.3f\t%"PRIu64"\t\t%"PRIu64"\t%.1E\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), sock.chunks, sock.elapsed_time, ndf_expected, ndf_real, (double)((int64_t)(ndf_expected - ndf_real))/ndf_expected);
+      multilog(runtime_log, LOG_INFO, "%s\t\t%d\t%d\t%.3f\t%"PRIu64"\t\t%"PRIu64"\t%.3E\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), sock.nchunk_port, sock.elapsed_time, ndf_expected, ndf_real, (double)((int64_t)(ndf_expected - ndf_real))/ndf_expected);
+      fprintf(stdout, "%s\t%d\t%d\t%.3f\t%"PRIu64"\t\t%"PRIu64"\t%.3E\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), sock.nchunk_port, sock.elapsed_time, ndf_expected, ndf_real, (double)((int64_t)(ndf_expected - ndf_real))/ndf_expected);
     }
   
   return EXIT_SUCCESS;

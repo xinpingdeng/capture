@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'e':
-	  sscanf(optarg, "%[^:]:%d:%d", conf.ip[conf.nport], &conf.port[conf.nport], &conf.nchunk[conf.nport]);
+	  sscanf(optarg, "%[^:]:%d:%d", conf.ip[conf.nport], &conf.port[conf.nport], &conf.nchunk_port[conf.nport]);
 	  conf.nport ++;
 	  break;
 

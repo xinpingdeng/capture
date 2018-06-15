@@ -47,7 +47,7 @@ typedef struct sock_t
 {
   int sock;
   int active;
-  int chunks;
+  int nchunk_port;
   uint64_t ndf;
   double elapsed_time;
   double freq[MCHK_PORT];
@@ -60,11 +60,11 @@ typedef struct conf_t
   int nport;
   char ip[MPORT_NIC][MSTR_LEN];
   int port[MPORT_NIC];
-  int nchunk[MPORT_NIC];
+  int nchunk_port[MPORT_NIC];
   
   int pkt_size, pkt_offset;  // pkt_offset is used for the case we do not record header of data frame, if we record header of data frame, the pkt_offset is 0;
   // Also pkt_size is the same with the size of data frame if we record header of each data frame, otherwise it is the size of data block of data frame;
-  int active_ports, active_chunks;
+  int active_nport, nchunk;
   uint64_t rbufsz, tbufsz;
   int sod;
   
@@ -89,17 +89,16 @@ typedef struct conf_t
 //int acquire_ifreq(struct sockaddr_in sa, int *ifreq);
 int acquire_ifreq(hdr_t hdr, double freq, int *ifreq);
 int acquire_idf(hdr_t hdr, hdr_t hdr_ref, int64_t *idf);
-int acquire_hdr_end(sock_t *sock, double length, int active_ports);
+int acquire_hdr_end(sock_t *sock, double length, int active_nport);
 
-int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int nport);
-//int init_rbuf(uint64_t rbufsz, int nbufs, key_t key);
+int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int *nchunk_port, int nport, int *active_nport, int *nchunk);
 
-  int check_connection(sock_t *sock, int *active_ports, int *active_chunks);
-int sock_sort(sock_t *sock);
-int align_df(sock_t *sock, int active_ports);
+int check_connection(sock_t *sock, int nport, int *active_nport, int *nchunk);
+int sock_sort(sock_t *sock, int nport);
+int align_df(sock_t *sock, int active_nport);
 
 int destroy_capture(conf_t conf);
-int destroy_sockets(sock_t *sock);
+int destroy_sockets(sock_t *sock, int active_nport);
 
 void *capture_thread(void *conf);
 int statistics(conf_t conf);

@@ -37,7 +37,7 @@ int threads(conf_t *conf)
   unsigned char *ip = (unsigned char *)&conf->sock[0].sa.sin_addr.s_addr;  // The way to bind thread into different NUMA node;
   node = (int)ip[3] - 1;   // Count from zero;
   ip = NULL;
-  int active_ports = conf->active_ports;
+  int active_nport = conf->active_nport;
 
 #ifdef DEBUG
   fprintf(stdout, "*********************************************\n");
@@ -45,7 +45,7 @@ int threads(conf_t *conf)
   fprintf(stdout, "*********************************************\n");
 #endif
   
-  for(i = 0; i < active_ports; i++)   // Create threads
+  for(i = 0; i < active_nport; i++)   // Create threads
     {
       pthread_attr_init(&attr);  
       CPU_ZERO(&cpus);
@@ -60,14 +60,14 @@ int threads(conf_t *conf)
   
   pthread_attr_init(&attr);  
   CPU_ZERO(&cpus);
-  CPU_SET(active_ports + node * NCPU_NUMA, &cpus);
+  CPU_SET(active_nport + node * NCPU_NUMA, &cpus);
   
   pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);	
-  ret[active_ports] = pthread_create(&thread[active_ports], &attr, sync_thread, (void *)conf);
-  //ret[active_ports] = pthread_create(&thread[active_ports], NULL, sync_thread, (void *)conf);
+  ret[active_nport] = pthread_create(&thread[active_nport], &attr, sync_thread, (void *)conf);
+  //ret[active_nport] = pthread_create(&thread[active_nport], NULL, sync_thread, (void *)conf);
   pthread_attr_destroy(&attr);
   
-  for(i = 0; i < active_ports + 1; i++)   // Join threads and unbind cpus
+  for(i = 0; i < active_nport + 1; i++)   // Join threads and unbind cpus
     pthread_join(thread[i], NULL);
 
   return EXIT_SUCCESS;
@@ -76,7 +76,7 @@ int threads(conf_t *conf)
 void *sync_thread(void *conf)
 {
   conf_t *captureconf = (conf_t *)conf;
-  int i, active_chunks = captureconf->active_chunks, ntransit, nfinish;
+  int i, nchunk = captureconf->nchunk, ntransit, nfinish;
   struct timespec start, stop;// sleep_time;
   uint64_t cbuf_loc, tbuf_loc, ntail;
   int ifreq, idf;
@@ -88,11 +88,11 @@ void *sync_thread(void *conf)
   while(true)
     {
       ntransit = 0; 
-      for(i = 0; i < captureconf->active_ports; i++)
+      for(i = 0; i < captureconf->active_nport; i++)
 	ntransit += transit[i];
       
       /* To see if we need to move to next buffer block */
-      if((ntransit > active_chunks) || force_switch)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
+      if((ntransit > nchunk) || force_switch)                   // Once we have more than active_links data frames on temp buffer, we will move to new ring buffer block
 	{
 #ifdef DEBUG
 	  clock_gettime(CLOCK_REALTIME, &start);
@@ -112,7 +112,7 @@ void *sync_thread(void *conf)
 #ifdef DEBUG
 	  clock_gettime(CLOCK_REALTIME, &stop);
 #endif
-	  for(i = 0; i < captureconf->active_ports; i++)
+	  for(i = 0; i < captureconf->active_nport; i++)
 	    {
 	      // Update the reference hdr, once capture thread get the updated reference, the data will go to the next block;
 	      // We have to put a lock here as partial update of reference hdr will be a trouble to other threads;
@@ -132,7 +132,7 @@ void *sync_thread(void *conf)
 	  while(true) // Wait until all threads are on new buffer block
 	    {
 	      ntransit = 0;
-	      for(i = 0; i < captureconf->active_ports; i++)
+	      for(i = 0; i < captureconf->active_nport; i++)
 		ntransit += transit[i];
 	      if(ntransit == 0)
 		break;
@@ -140,7 +140,7 @@ void *sync_thread(void *conf)
 	  
 	  /* To see if we need to copy data from temp buffer into ring buffer */
 	  ntail = 0;
-	  for(i = 0; i < captureconf->active_ports; i++)
+	  for(i = 0; i < captureconf->active_nport; i++)
 	    ntail = (tail[i] > ntail) ? tail[i] : ntail;
 	  
 #ifdef DEBUG
@@ -176,9 +176,9 @@ void *sync_thread(void *conf)
 
       /* To see if we need to stop */
       nfinish = 0;
-      for(i = 0; i < captureconf->active_ports; i++)
+      for(i = 0; i < captureconf->active_nport; i++)
 	nfinish += finish[i];
-      if(nfinish == captureconf->active_ports)
+      if(nfinish == captureconf->active_nport)
 	{
 	  //if(ipcbuf_mark_filled ((ipcbuf_t*)captureconf->hdu->data_block, captureconf->rbufsz) < 0)
 	  if(ipcio_close_block_write (captureconf->hdu->data_block, captureconf->rbufsz) < 0)  // This should enable eod at current buffer
