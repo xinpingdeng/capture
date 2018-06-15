@@ -79,7 +79,7 @@ def main():
 
     hdr    = 0
     freq   = 1340.5 # We need to remove this line in real observation
-    length = 10
+    length = 100
     directory = "/beegfs/DENG/docker"
 
     com_line = "./capture.py -a capture.conf -b {:s} -c {:f} -d {:s} -e {:f} -f {:d}".format(' '.join(address), length, directory, freq, hdr)

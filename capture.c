@@ -98,7 +98,7 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	  else               // If the port is active, we check the available frequency chunks
 	    {
 	      freq = hdr_freq(df);
-	      fprintf(stdout, "%f\n", freq);
+	      //fprintf(stdout, "%f\n", freq);
 	      if(freq==0)    // Frequency can not be zero
 		{
 		  multilog(runtime_log, LOG_ERR, "The data received on %s:%d is not right, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
@@ -456,7 +456,7 @@ void *capture_thread(void *conf)
 	  return NULL;
 	}      
       hdr_keys(df, &hdr);               // Get header information, which will be used to get the location of packets
-      acquire_ifreq(sa, &ifreq);              // Get the frequency index of received data frame with source ip address;
+      acquire_ifreq(hdr, captureconf->freq, &ifreq);              // Get the frequency index of received data frame with source ip address;
       
       pthread_mutex_lock(&hdr_ref_mutex[ithread]);
       acquire_idf(hdr, hdr_ref[ithread], &idf);  // How many data frames we get after the reference;
@@ -568,19 +568,26 @@ int acquire_idf(hdr_t hdr, hdr_t hdr_ref, int64_t *idf)
   return EXIT_SUCCESS;
 }
 
-int acquire_ifreq(struct sockaddr_in sa, int *ifreq)
+//int acquire_ifreq(struct sockaddr_in sa, int *ifreq)
+//{
+//  /*
+//    Here we assume that the last digital of BMF ip address counts from 1;
+//    10.16.X.1 to 10.16.X.12, X is from 1 to 8;
+//    If not, we will be in trouble and need to update here;
+//    The first 48 links are 1, 3, 5, 7, 9, 11 of each BMF
+//    The second 48 links are 2, 4, 6, 8, 10, 12 of each BMF;
+//  */
+//  
+//  unsigned char *ip = (unsigned char *)&sa.sin_addr.s_addr;
+//  *ifreq = (int)(ip[2] - 1) * NCHK_BMF + (int)ceil((double)(ip[3]/2.0)) - 1;
+//  ip = NULL;  
+//  return EXIT_SUCCESS;
+//}
+
+int acquire_ifreq(hdr_t hdr, double freq, int *ifreq)
 {
-  /*
-    Here we assume that the last digital of BMF ip address counts from 1;
-    10.16.X.1 to 10.16.X.12, X is from 1 to 8;
-    If not, we will be in trouble and need to update here;
-    The first 48 links are 1, 3, 5, 7, 9, 11 of each BMF
-    The second 48 links are 2, 4, 6, 8, 10, 12 of each BMF;
-  */
   
-  unsigned char *ip = (unsigned char *)&sa.sin_addr.s_addr;
-  *ifreq = (int)(ip[2] - 1) * NCHK_BMF + (int)ceil((double)(ip[3]/2.0)) - 1;
-  ip = NULL;  
+  *ifreq = (int)((hdr.freq - freq - 0.5)/CHK_BW + NCHK_NIC/2);
   return EXIT_SUCCESS;
 }
 

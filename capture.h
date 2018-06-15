@@ -19,6 +19,7 @@
 #define MCHK_PORT         8   // How many chunks per port are allowed;
 #define NCHK_NIC          48  // How many frequency chunks we will receive, we should read the number from metadata
 #define NCHK_BMF          6   // How many chunks each BMF process
+#define CHK_BW            7
 #define MPORT_NIC         6
 #define NPORT_NIC         6   // This number should from metadata
 #define PORT_BASE         17100
@@ -85,7 +86,8 @@ typedef struct conf_t
   struct sock_t sock[MPORT_NIC];
 }conf_t;
 
-int acquire_ifreq(struct sockaddr_in sa, int *ifreq);
+//int acquire_ifreq(struct sockaddr_in sa, int *ifreq);
+int acquire_ifreq(hdr_t hdr, double freq, int *ifreq);
 int acquire_idf(hdr_t hdr, hdr_t hdr_ref, int64_t *idf);
 int acquire_hdr_end(sock_t *sock, double length, int active_ports);
 
