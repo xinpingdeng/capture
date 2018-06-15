@@ -59,6 +59,7 @@ typedef struct conf_t
   int nport;
   char ip[MPORT_NIC][MSTR_LEN];
   int port[MPORT_NIC];
+  int nchunk[MPORT_NIC];
   
   int pkt_size, pkt_offset;  // pkt_offset is used for the case we do not record header of data frame, if we record header of data frame, the pkt_offset is 0;
   // Also pkt_size is the same with the size of data frame if we record header of each data frame, otherwise it is the size of data block of data frame;

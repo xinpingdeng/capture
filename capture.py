@@ -19,25 +19,6 @@ def ConfigSectionMap(section):
             dict1[option] = None
     return dict1
 
-## Get center frequency from multi cast
-#multicast_group = '224.1.1.1'
-#server_address = ('', 5007)
-#sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Create the socket
-#sock.bind(server_address) # Bind to the server address
-#group = socket.inet_aton(multicast_group)
-#mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-#sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)  # Tell the operating system to add the socket to the multicast group on all interfaces.
-##sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, mreq)  
-#pkt, address = sock.recvfrom(1<<16)
-#data = json.loads(pkt)#['beams_direction']#['beam01']
-##sock.shutdown(socket.SHUT_RDWR)
-#sock.close()
-#freq = float(data['sky_frequency'])
-
-freq = 1340.5
-hdr  = 0
-print "The centre frequency is {:.1f}MHz".format(freq)
-
 # Read in command line arguments
 parser = argparse.ArgumentParser(description='Fold data from BMF stream')
 parser.add_argument('-a', '--cfname', type=str, nargs='+',
@@ -48,12 +29,20 @@ parser.add_argument('-c', '--length', type=float, nargs='+',
                 help='Length of data receiving')
 parser.add_argument('-d', '--directory', type=str, nargs='+',
                     help='In which directory we record the data and read configuration files and parameter files')
+parser.add_argument('-e', '--freq', type=float, nargs='+',
+                help='Center frequency of observing band')
+parser.add_argument('-f', '--hdr', type=int, nargs='+',
+                    help='Record header of data packet or not')
 
 args         = parser.parse_args()
 cfname       = args.cfname[0]
 length       = args.length[0]
 directory    = args.directory[0]
 address      = args.address
+freq         = args.freq[0]
+hdr          = args.hdr[0]
+
+print "The centre frequency is {:.1f}MHz".format(freq)
 
 # Play with configuration file
 Config = ConfigParser.ConfigParser()
@@ -81,8 +70,9 @@ capture_sod     = ConfigSectionMap("CaptureConf")['sod']
 capture_rbufsz  = capture_ndf *  nchk_nic * 7168
 
 def capture():
-    print ("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, address[0], address[1], address[2], address[3], address[4], address[5],  capture_hfname, capture_efname, freq, length, directory))
-    os.system("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -e {:s} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, address[0], address[1], address[2], address[3], address[4], address[5],  capture_hfname, capture_efname, freq, length, directory))
+    com_line = "./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, " -e ".join(address),  capture_hfname, capture_efname, freq, length, directory)
+    print com_line
+    os.system("./paf_capture -a {:s} -b {:s} -c {:d} -d {:d} -e {:s} -f {:s} -g {:s} -i {:f} -j {:f} -k {:s}".format(capture_key, capture_sod, capture_ndf, hdr, " -e ".join(address), capture_hfname, capture_efname, freq, length, directory))
     
 def main():
     os.system("dada_db -l -p -k {:s} -b {:d} -n {:s} -r {:s}".format(capture_key, capture_rbufsz, capture_nbuf, capture_nreader))

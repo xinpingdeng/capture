@@ -31,15 +31,15 @@ void usage()
 	   "\n"
 	   "Usage: paf_capture [options]\n"
 	   " -a Hexadecimal shared memory key for capture \n"
-	   " -b Enable start-of-data or not    \n"
+	   " -b Enable start-of-data or not, WILL BE REMOVED LATER \n"
 	   " -c The size of each capture ring buffer block in data frame steps    \n"
 	   " -d Record header of data packets or not    \n"
-	   " -e IP adress and port on which we capture data, accept multiple values with -e value1 -e value2 ... \n"
+	   " -e IP adress and port on which we capture data, accept multiple values with -e value1 -e value2 ... the format of it is \"ip:port:number-of-chunks\" \n"
 	   " -f The name of DADA header template file    \n"
-	   " -g The name of epoch file, which records the conversion of BMF timing  \n"
+	   " -g The name of epoch file, which records the conversion for BMF timestamp  \n"
 	   " -h Show help    \n"
 	   " -i The center frequency of captured data    \n"
-	   " -j The length of data capture    \n"
+	   " -j The length of data capture, WILL BE REMOVED LATER \n"
 	   " -k Which directory will be used to record data    \n");
 }
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'e':
-	  sscanf(optarg, "%[^:]:%d", conf.ip[conf.nport], &conf.port[conf.nport]);
+	  sscanf(optarg, "%[^:]:%d:%d", conf.ip[conf.nport], &conf.port[conf.nport], &conf.nchunk[conf.nport]);
 	  conf.nport ++;
 	  break;
 
@@ -114,6 +114,7 @@ int main(int argc, char **argv)
 	}
     }
 
+  //fprintf(stdout, "%s\t%d\t%d\n", conf.ip[0], conf.port[0], conf.nchunk[0]);
 
 #ifdef DEBUG
   fprintf(stdout, "*********************************************\n");

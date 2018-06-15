@@ -65,39 +65,26 @@ def multicast2obsinfo(beam):
         exit()
 
     # Return result and close socket
-    return target_name, ra, dec, freq, node[0], len(address_chunk), address_chunk
+    return target_name, ra, dec, freq, node[0], sorted(address_chunk)
     sock.close()
     
 def main():
-    beam = 0  # Beam index count from 0
-    name, ra, dec, freq, node, naddress, address = multicast2obsinfo(beam) # name is the target name, ra and dec is the beam ra and dec, freq is center frequency of observing band, naddress is the number of ports for data receiving, address is the ip:port:number-of-frequency-chunks format of address
-    print name, ra, dec, freq, node, naddress, address
-    
+    beam = 16  # Beam index count from 0
+
+    name, ra, dec, freq, node, address = multicast2obsinfo(beam)
+    # name is the target name, ra and dec is the beam ra and dec, freq is center frequency of observing band, address is the ip:port:number-of-frequency-chunks format of address
+      
+    # At current stage, if we want to change between modes, we need to update source code;
+    # If we want to use different configuration, we need to update source code and also script configuration;
+
+    hdr    = 0
+    freq   = 1340.5 # We need to remove this line in real observation
+    length = 10
+    directory = "/beegfs/DENG/docker"
+
+    com_line = "./capture.py -a capture.conf -b {:s} -c {:f} -d {:s} -e {:f} -f {:d}".format(' '.join(address), length, directory, freq, hdr)
+    print com_line
+    os.system("./capture.py -a capture.conf -b {:s} -c {:f} -d {:s} -e {:f} -f {:d}".format(' '.join(address), length, directory, freq, hdr))
+
 if __name__ == "__main__":
     main()
-    HOST="pacifix1"
-    COMMAND="uname -a"
-    
-    ssh = subprocess.Popen(["ssh", "%s" % HOST, COMMAND],
-                        shell=False,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE)
-    result = ssh.stdout.readlines()
-    if result == []:
-        error = ssh.stderr.readlines()
-        print >>sys.stderr, "ERROR: %s" % error
-    else:
-        print result
-    
-
-    
-## At current stage, if we want to change between modes, we need to update source code;
-## If we want to use different configuration, we need to update source code and also script configuration;
-#
-#ip1 = "10.17.2.2"
-#ip2 = "10.17.2.2"
-#
-#length = 10
-#directory = "/beegfs/DENG/docker"
-#
-#os.system("./capture.py -a capture.conf -b {:s}:17100 {:s}:17101 {:s}:17102 {:s}:17103 {:s}:17104 {:s}:17105 -c {:f} -d {:s}".format(ip1, ip1, ip1, ip2, ip2, ip2, length, directory))
