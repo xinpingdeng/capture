@@ -93,9 +93,9 @@ int acquire_hdr_end(sock_t *sock, double length, int active_nport);
 
 int init_sockets(sock_t *sock, char ip[MPORT_NIC][MSTR_LEN], int *port, int *nchunk_port, int nport, int *active_nport, int *nchunk);
 
-int check_connection(sock_t *sock, int nport, int *active_nport, int *nchunk);
+//int check_connection(sock_t *sock, int nport, int *active_nport, int *nchunk);
 int sock_sort(sock_t *sock, int nport);
-int align_df(sock_t *sock, int active_nport);
+//int align_df(sock_t *sock, int active_nport);
 
 int destroy_capture(conf_t conf);
 int destroy_sockets(sock_t *sock, int active_nport);

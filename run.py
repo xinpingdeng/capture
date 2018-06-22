@@ -69,7 +69,7 @@ def multicast2obsinfo(beam):
     sock.close()
     
 def main():
-    beam = 16  # Beam index count from 0
+    beam = 0  # Beam index count from 0
 
     name, ra, dec, freq, node, address = multicast2obsinfo(beam)
     # name is the target name, ra and dec is the beam ra and dec, freq is center frequency of observing band, address is the ip:port:number-of-frequency-chunks format of address
